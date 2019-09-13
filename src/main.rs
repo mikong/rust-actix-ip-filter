@@ -9,7 +9,7 @@ use diesel::prelude::*;
 use diesel::{r2d2::ConnectionManager, r2d2::Pool};
 use dotenv::dotenv;
 use std::env;
-use std::net::IpAddr;
+use std::net::{IpAddr, SocketAddr};
 
 mod actor;
 mod models;
@@ -39,9 +39,19 @@ fn index(data: web::Data<AppState>) -> HttpResponse {
 }
 
 fn ws_index(req: HttpRequest, stream: web::Payload) -> Result<HttpResponse, Error> {
-    let resp = ws::start(WsActor {}, &req, stream);
-    println!("{:?}", resp);
-    resp
+    if let Some(remote) = req.connection_info().remote() {
+        if let Ok(socket_addr) = remote.parse::<SocketAddr>() {
+            let data: web::Data<AppState> = req.get_app_data().unwrap();
+            let conn = &data.pool.get().unwrap();
+            let ip_str = &socket_addr.ip().to_string();
+            if ip_exists(conn, ip_str) {
+                let resp = ws::start(WsActor {}, &req, stream);
+                println!("{:?}", resp);
+                return resp;
+            }
+        }
+    }
+    Ok(HttpResponse::Forbidden().finish())
 }
 
 fn add(data: web::Data<AppState>) -> String {
@@ -75,6 +85,14 @@ fn add_ip(conn: &MysqlConnection, ip: &str) {
         .expect("Error saving IP address");
 }
 
+fn ip_exists(conn: &MysqlConnection, ip_str: &str) -> bool {
+    use schema::ip_addresses::dsl::*;
+
+    diesel::select(diesel::dsl::exists(ip_addresses.filter(ip.eq(ip_str))))
+        .get_result(conn)
+        .expect("Error checking existence")
+}
+
 fn remove_ip(conn: &MysqlConnection, ip_str: &str) -> String {
     use schema::ip_addresses::dsl::*;
 
@@ -102,7 +120,12 @@ fn main() {
     HttpServer::new(|| {
         let pool = establish_connection();
         App::new()
-            .service(web::resource("/ws/").route(web::get().to(ws_index)))
+            .service(
+                web::resource("/ws/")
+                    .data(AppState {
+                        pool: pool.clone(),
+                    })
+                    .route(web::get().to(ws_index)))
             .service(fs::Files::new("/client/", "static/").index_file("index.html"))
             .service(
                 web::scope("/")
