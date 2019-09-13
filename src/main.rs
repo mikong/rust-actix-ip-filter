@@ -1,6 +1,12 @@
+#[macro_use]
+extern crate diesel;
+
 use actix_web::{web, App, HttpServer};
 
 use std::net::IpAddr;
+
+mod models;
+mod schema;
 
 struct AppState {
     ips: Vec<IpAddr>,
