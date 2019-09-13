@@ -2,7 +2,7 @@
 extern crate diesel;
 extern crate dotenv;
 
-use actix_web::{web, App, HttpServer};
+use actix_web::{web, App, HttpServer, HttpResponse};
 use diesel::prelude::*;
 use dotenv::dotenv;
 use std::env;
@@ -10,25 +10,25 @@ use std::net::IpAddr;
 
 mod models;
 mod schema;
+mod html_list;
 
 use models::{IpAddress, NewIpAddress};
+use html_list::HtmlList;
 
 struct AppState {
     connection: MysqlConnection,
 }
 
-fn index(data: web::Data<AppState>) -> String {
+fn index(data: web::Data<AppState>) -> HttpResponse {
     use schema::ip_addresses::dsl::*;
 
     let results = ip_addresses
         .load::<IpAddress>(&data.connection)
         .expect("Error loading IP addresses");
 
-    for ip_address in results {
-        println!("{}", ip_address.ip);
-    }
-
-    format!("No IPs found")
+    HttpResponse::Ok()
+        .content_type("text/html")
+        .body(HtmlList::new(results))
 }
 
 fn add(data: web::Data<AppState>) -> String {
