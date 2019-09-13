@@ -39,6 +39,12 @@ fn add(data: web::Data<AppState>) -> String {
     "OK".to_string()
 }
 
+fn remove(data: web::Data<AppState>) -> String {
+    let ip = "127.0.0.1";
+
+    remove_ip(&data.connection, ip)
+}
+
 fn add_ip(conn: &MysqlConnection, ip: &str) {
     use schema::ip_addresses;
 
@@ -52,6 +58,18 @@ fn add_ip(conn: &MysqlConnection, ip: &str) {
         .values(&new_ip_address)
         .execute(conn)
         .expect("Error saving IP address");
+}
+
+fn remove_ip(conn: &MysqlConnection, ip_str: &str) -> String {
+    use schema::ip_addresses::dsl::*;
+
+    let ip_addr: IpAddr = ip_str.parse().expect("Not a valid IP address");
+
+    let num_deleted = diesel::delete(ip_addresses.filter(ip.eq(ip_addr.to_string())))
+        .execute(conn)
+        .expect("Error deleting IP addresses");
+
+    format!("Deleted {} IP addresses", num_deleted)
 }
 
 fn establish_connection() -> MysqlConnection {
@@ -70,6 +88,7 @@ fn main() {
             })
             .route("/", web::get().to(index))
             .route("/add", web::get().to(add))
+            .route("/remove", web::get().to(remove))
     })
     .bind("127.0.0.1:8088")
     .unwrap()
