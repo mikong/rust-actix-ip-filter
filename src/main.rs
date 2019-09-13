@@ -2,16 +2,20 @@
 extern crate diesel;
 extern crate dotenv;
 
-use actix_web::{web, App, HttpServer, HttpResponse};
+use actix_files as fs;
+use actix_web::{web, App, Error, HttpServer, HttpRequest, HttpResponse};
+use actix_web_actors::ws;
 use diesel::prelude::*;
 use dotenv::dotenv;
 use std::env;
 use std::net::IpAddr;
 
+mod actor;
 mod models;
 mod schema;
 mod html_list;
 
+use actor::ws::WsActor;
 use models::{IpAddress, NewIpAddress};
 use html_list::HtmlList;
 
@@ -29,6 +33,12 @@ fn index(data: web::Data<AppState>) -> HttpResponse {
     HttpResponse::Ok()
         .content_type("text/html")
         .body(HtmlList::new(results))
+}
+
+fn ws_index(req: HttpRequest, stream: web::Payload) -> Result<HttpResponse, Error> {
+    let resp = ws::start(WsActor {}, &req, stream);
+    println!("{:?}", resp);
+    resp
 }
 
 fn add(data: web::Data<AppState>) -> String {
@@ -83,12 +93,16 @@ fn establish_connection() -> MysqlConnection {
 fn main() {
     HttpServer::new(|| {
         App::new()
-            .data(AppState {
-                connection: establish_connection(),
-            })
-            .route("/", web::get().to(index))
-            .route("/add", web::get().to(add))
-            .route("/remove", web::get().to(remove))
+            .service(web::resource("/ws/").route(web::get().to(ws_index)))
+            .service(fs::Files::new("/client/", "static/").index_file("index.html"))
+            .service(
+                web::scope("/")
+                    .data(AppState {
+                        connection: establish_connection(),
+                    })
+                    .route("/ips", web::get().to(index))
+                    .route("/add", web::get().to(add))
+                    .route("/remove", web::get().to(remove)))
     })
     .bind("127.0.0.1:8088")
     .unwrap()
