@@ -6,6 +6,7 @@ use actix_files as fs;
 use actix_web::{web, App, Error, HttpServer, HttpRequest, HttpResponse};
 use actix_web_actors::ws;
 use diesel::prelude::*;
+use diesel::{r2d2::ConnectionManager, r2d2::Pool};
 use dotenv::dotenv;
 use std::env;
 use std::net::IpAddr;
@@ -20,14 +21,16 @@ use models::{IpAddress, NewIpAddress};
 use html_list::HtmlList;
 
 struct AppState {
-    connection: MysqlConnection,
+    pool: Pool<ConnectionManager<MysqlConnection>>,
 }
 
 fn index(data: web::Data<AppState>) -> HttpResponse {
     use schema::ip_addresses::dsl::*;
 
+    let conn = &data.pool.get().unwrap();
+
     let results = ip_addresses
-        .load::<IpAddress>(&data.connection)
+        .load::<IpAddress>(conn)
         .expect("Error loading IP addresses");
 
     HttpResponse::Ok()
@@ -44,7 +47,8 @@ fn ws_index(req: HttpRequest, stream: web::Payload) -> Result<HttpResponse, Erro
 fn add(data: web::Data<AppState>) -> String {
     let ip = "127.0.0.1";
 
-    add_ip(&data.connection, ip);
+    let conn = &data.pool.get().unwrap();
+    add_ip(conn, ip);
 
     "OK".to_string()
 }
@@ -52,7 +56,8 @@ fn add(data: web::Data<AppState>) -> String {
 fn remove(data: web::Data<AppState>) -> String {
     let ip = "127.0.0.1";
 
-    remove_ip(&data.connection, ip)
+    let conn = &data.pool.get().unwrap();
+    remove_ip(conn, ip)
 }
 
 fn add_ip(conn: &MysqlConnection, ip: &str) {
@@ -82,23 +87,27 @@ fn remove_ip(conn: &MysqlConnection, ip_str: &str) -> String {
     format!("Deleted {} IP addresses", num_deleted)
 }
 
-fn establish_connection() -> MysqlConnection {
+fn establish_connection() -> Pool<ConnectionManager<MysqlConnection>> {
     dotenv().ok();
 
     let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
-    MysqlConnection::establish(&database_url)
-        .unwrap_or_else(|_| panic!("Error connectiong to {}", database_url))
+
+    let manager = ConnectionManager::<MysqlConnection>::new(database_url);
+    r2d2::Pool::builder()
+        .build(manager)
+        .expect("Failed to build connection pool")
 }
 
 fn main() {
     HttpServer::new(|| {
+        let pool = establish_connection();
         App::new()
             .service(web::resource("/ws/").route(web::get().to(ws_index)))
             .service(fs::Files::new("/client/", "static/").index_file("index.html"))
             .service(
                 web::scope("/")
                     .data(AppState {
-                        connection: establish_connection(),
+                        pool: pool.clone(),
                     })
                     .route("/ips", web::get().to(index))
                     .route("/add", web::get().to(add))
