@@ -1,7 +1,7 @@
 table! {
     ip_addresses (id) {
         id -> Integer,
-        ip -> Varbinary,
+        ip -> Varchar,
         ts -> Timestamp,
     }
 }
