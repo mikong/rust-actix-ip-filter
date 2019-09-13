@@ -11,7 +11,7 @@ use std::net::IpAddr;
 mod models;
 mod schema;
 
-use models::*;
+use models::{IpAddress, NewIpAddress};
 
 struct AppState {
     connection: MysqlConnection,
@@ -31,6 +31,29 @@ fn index(data: web::Data<AppState>) -> String {
     format!("No IPs found")
 }
 
+fn add(data: web::Data<AppState>) -> String {
+    let ip = "127.0.0.1";
+
+    add_ip(&data.connection, ip);
+
+    "OK".to_string()
+}
+
+fn add_ip(conn: &MysqlConnection, ip: &str) {
+    use schema::ip_addresses;
+
+    let ip_addr: IpAddr = ip.parse().expect("Not a valid IP address");
+
+    let new_ip_address = NewIpAddress {
+        ip: &ip_addr.to_string(),
+    };
+
+    diesel::insert_into(ip_addresses::table)
+        .values(&new_ip_address)
+        .execute(conn)
+        .expect("Error saving IP address");
+}
+
 fn establish_connection() -> MysqlConnection {
     dotenv().ok();
 
@@ -46,6 +69,7 @@ fn main() {
                 connection: establish_connection(),
             })
             .route("/", web::get().to(index))
+            .route("/add", web::get().to(add))
     })
     .bind("127.0.0.1:8088")
     .unwrap()
