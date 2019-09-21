@@ -1,6 +1,3 @@
-#[macro_use]
-extern crate diesel;
-
 use diesel::prelude::*;
 use dotenv::dotenv;
 use std::env;
@@ -8,12 +5,8 @@ use std::io;
 use std::io::{Write};
 use std::net::IpAddr;
 
-#[path = "../models.rs"]
-mod models;
-#[path = "../schema.rs"]
-mod schema;
-
-use models::{NewIpAddress};
+use actix_ip_filter::schema;
+use actix_ip_filter::models::{NewIpAddress};
 
 fn main() {
     let conn = establish_connection();

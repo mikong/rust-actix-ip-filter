@@ -1,4 +1,4 @@
-use crate::models::IpAddress;
+use actix_ip_filter::models::IpAddress;
 
 pub struct HtmlList;
 

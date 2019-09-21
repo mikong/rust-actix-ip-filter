@@ -1,6 +1,3 @@
-#[macro_use]
-extern crate diesel;
-
 use actix_files as fs;
 use actix_web::{web, App, Error, HttpServer, HttpRequest, HttpResponse};
 use actix_web_actors::ws;
@@ -11,12 +8,11 @@ use std::env;
 use std::net::{SocketAddr};
 
 mod actor;
-mod models;
-mod schema;
 mod html_list;
 
 use actor::ws::WsActor;
-use models::{IpAddress};
+use actix_ip_filter::models::{IpAddress};
+use actix_ip_filter::schema;
 use html_list::HtmlList;
 
 struct AppState {
