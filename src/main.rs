@@ -73,7 +73,8 @@ fn establish_connection() -> Pool<ConnectionManager<MysqlConnection>> {
 }
 
 fn main() {
-    HttpServer::new(|| {
+    let address = "127.0.0.1:8088";
+    let server = HttpServer::new(|| {
         let pool = establish_connection();
         App::new()
             .service(
@@ -90,8 +91,12 @@ fn main() {
                     })
                     .route("/ips", web::get().to(index)))
     })
-    .bind("127.0.0.1:8088")
-    .unwrap()
-    .run()
-    .unwrap()
+    .bind(address)
+    .unwrap();
+
+    println!("Listening on:");
+    println!("http://{}", address);
+    println!("ws://{}/ws/", address);
+
+    server.run().unwrap();    
 }
