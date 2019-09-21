@@ -1,6 +1,5 @@
 #[macro_use]
 extern crate diesel;
-extern crate dotenv;
 
 use actix_files as fs;
 use actix_web::{web, App, Error, HttpServer, HttpRequest, HttpResponse};
