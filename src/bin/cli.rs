@@ -6,6 +6,7 @@ use std::io::{Write};
 use std::net::IpAddr;
 
 use actix_ip_filter::schema;
+use actix_ip_filter::ip_query;
 use actix_ip_filter::models::{NewIpAddress};
 
 fn main() {
@@ -57,10 +58,12 @@ fn add_ip(conn: &MysqlConnection, ip: &str) {
         ip: &ip_addr.to_string(),
     };
 
-    diesel::insert_into(ip_addresses::table)
-        .values(&new_ip_address)
-        .execute(conn)
-        .expect("Error saving IP address");
+    if !ip_query::ip_exists(conn, ip) {
+        diesel::insert_into(ip_addresses::table)
+            .values(&new_ip_address)
+            .execute(conn)
+            .expect("Error saving IP address");
+    }
 }
 
 fn remove_ip(conn: &MysqlConnection, ip_str: &str) -> String {
