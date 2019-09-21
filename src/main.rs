@@ -12,6 +12,7 @@ mod html_list;
 
 use actor::ws::WsActor;
 use actix_ip_filter::models::{IpAddress};
+use actix_ip_filter::ip_query;
 use actix_ip_filter::schema;
 use html_list::HtmlList;
 
@@ -39,7 +40,7 @@ fn ws_index(req: HttpRequest, stream: web::Payload) -> Result<HttpResponse, Erro
             let data: web::Data<AppState> = req.get_app_data().unwrap();
             let conn = &data.pool.get().unwrap();
             let ip_str = &socket_addr.ip().to_string();
-            if ip_exists(conn, ip_str) {
+            if ip_query::ip_exists(conn, ip_str) {
                 let resp = ws::start(WsActor {}, &req, stream);
                 println!("{:?}", resp);
                 return resp;
@@ -47,14 +48,6 @@ fn ws_index(req: HttpRequest, stream: web::Payload) -> Result<HttpResponse, Erro
         }
     }
     Ok(HttpResponse::Forbidden().finish())
-}
-
-fn ip_exists(conn: &MysqlConnection, ip_str: &str) -> bool {
-    use schema::ip_addresses::dsl::*;
-
-    diesel::select(diesel::dsl::exists(ip_addresses.filter(ip.eq(ip_str))))
-        .get_result(conn)
-        .expect("Error checking existence")
 }
 
 fn establish_connection() -> Pool<ConnectionManager<MysqlConnection>> {
